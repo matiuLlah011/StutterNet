@@ -12,7 +12,3 @@ __pycache__/
 spectrograms/**/*.npy
 spectrograms/**/*.png
 checkpoints/*.pt
-
-# Keep directory structure
-!spectrograms/*/.gitkeep
-!checkpoints/.gitkeep
