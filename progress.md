@@ -3,7 +3,7 @@
 ## Overview
 **StutterNet+** is a deep learning system for **Urdu stuttering detection** using synthesized + real speech data. The model classifies speech into three stutter types: syllable repetition (حرف), word repetition (لفظ), and block/pause stuttering (بلاک).
 
-**Current state:** 463 samples (55+ min audio), 3 TTS voices + real podcast data, 52.9% accuracy with best macro F1 = 0.52.
+**Current state:** 543 samples (~65 min audio), 3 TTS voices + real podcast + zip dataset, best macro F1 = 0.52 (Phase 4, 463 samples).
 
 ---
 
@@ -42,15 +42,17 @@ python3 evaluate.py
 | Label | Name | Urdu | ID Prefix |
 |---|---|---|---|
 | 0 | clean | صاف | (no samples yet) |
-| 1 | syllable_repetition | حرف | HARF_*, PODCAST_Phenome* |
-| 2 | word_repetition | لفظ | LAFZ_* |
-| 3 | block | بلاک | BLOCK_*, PODCAST_Pause*, PODCAST_Pronglation* |
+| 1 | syllable_repetition | حرف | HARF_*, PODCAST_Phenome*, ZIPAUDIO_*_Sy, ZIPNEW_حرف_* |
+| 2 | word_repetition | لفظ | LAFZ_*, ZIPAUDIO_*_w, ZIPNEW_لفظ_* |
+| 3 | block | بلاک | BLOCK_*, PODCAST_Pause*, PODCAST_Pronglation*, ZIPAUDIO_*_p, ZIPNEW_بلاک_* |
 
 ### Voice ID suffixes in sample names
 - No suffix (e.g., `HARF_005`) = Abdullah voice
 - `_I` suffix (e.g., `HARF_I005`) = Ibrahim voice
 - `_M` suffix (e.g., `HARF_M005`) = Mati voice
 - `PODCAST_` prefix = Real speech from podcast recordings
+- `ZIPAUDIO_` prefix = Real speech from zip dataset (Audios folder)
+- `ZIPNEW_` prefix = Real speech from zip dataset (new data folder)
 
 ### ElevenLabs TTS config
 - API key is in `generate_bulk.py` and `generate_multivoice.py` (should be moved to env var)
@@ -164,28 +166,63 @@ Output: (B, 4) logits
 
 ---
 
+## Phase 5: Zip Dataset Integration
+
+### Data Source
+- Downloaded zip file from Google Drive: `https://drive.google.com/file/d/1UWVAV8po7-j4PIaNyFmQHz8BrQNvxfxO/view`
+- Contains **80 usable samples** from multiple real speakers
+
+### Zip Dataset Breakdown
+| Source Folder | Files | Labeling Method | Mapped To |
+|---|---|---|---|
+| Audios/ (suffix -Sy) | 10 | Filename suffix | syllable_repetition (label 1) |
+| Audios/ (suffix -w) | 27 | Filename suffix | word_repetition (label 2) |
+| Audios/ (suffix -p) | 24 | Filename suffix | block (label 3) |
+| new data/ (CSV) | 19 | annotations.csv | Mixed types |
+| **Total** | **80** | | |
+
+- Voice attribution: ZipData_V1 (7), ZipData_V2 (6), ZipData_V3 (6), ZipData_Real (61)
+- Files converted to 16kHz mono WAV and added to `samples/` with `ZIPAUDIO_` and `ZIPNEW_` prefixes
+
+### Results (543 samples — 3 TTS + podcast + zip)
+| Class | Precision | Recall | F1-Score |
+|---|---|---|---|
+| Syllable Repetition | 0.63 | 0.46 | 0.53 |
+| Word Repetition | 0.46 | 0.74 | 0.57 |
+| Block | 0.39 | 0.28 | 0.32 |
+| **Overall Accuracy** | | | **49.2%** |
+| **Macro F1** | | | **0.47** |
+
+- Trained for 58 epochs (early stopped), best val loss: 0.3186
+- **Regression from Phase 4** — zip data has different acoustic properties (domain mismatch)
+- ~26 additional MP3s in zip "new data" folder remain unintegrated
+
+---
+
 ## Full Results Comparison
 
-| Metric | Phase 2 (145) | Phase 3 (415) | Phase 4 (463) | Best |
-|---|---|---|---|---|
-| Overall Accuracy | 53.8% | **56.1%** | 52.9% | Phase 3 |
-| Syllable Rep F1 | 0.67 | **0.78** | 0.57 | Phase 3 |
-| Word Rep F1 | 0.59 | 0.58 | **0.64** | Phase 4 |
-| Block F1 | 0.20 | 0.06 | **0.35** | Phase 4 |
-| **Macro F1** | 0.49 | 0.47 | **0.52** | Phase 4 |
-| Val Loss | **0.2946** | 0.3153 | 0.3055 | Phase 2 |
+| Metric | Phase 2 (145) | Phase 3 (415) | Phase 4 (463) | Phase 5 (543) | Best |
+|---|---|---|---|---|---|
+| Overall Accuracy | 53.8% | **56.1%** | 52.9% | 49.2% | Phase 3 |
+| Syllable Rep F1 | 0.67 | **0.78** | 0.57 | 0.53 | Phase 3 |
+| Word Rep F1 | 0.59 | 0.58 | **0.64** | 0.57 | Phase 4 |
+| Block F1 | 0.20 | 0.06 | **0.35** | 0.32 | Phase 4 |
+| **Macro F1** | 0.49 | 0.47 | **0.52** | 0.47 | Phase 4 |
+| Val Loss | **0.2946** | 0.3153 | 0.3055 | 0.3186 | Phase 2 |
 
 ### Key Takeaways
 1. **Real podcast data was the biggest improvement** — block F1 went from 0.06 → 0.35
 2. **Multi-voice TTS helped syllable detection** (F1=0.78 in Phase 3)
-3. **Macro F1 is highest with real data** (0.52) — most balanced across all classes
-4. More real speech data is the most impactful next step
+3. **Phase 4 has best macro F1** (0.52) — most balanced across all classes
+4. **Zip data caused regression** — acoustic domain mismatch hurt overall performance
+5. Domain adaptation or better preprocessing may be needed for heterogeneous data sources
+6. More real speech data with consistent recording quality is the most impactful next step
 
 ---
 
 ## Current Dataset Summary
 
-### Total: 463 samples (~61 minutes of audio)
+### Total: 543 samples (~65 minutes of audio)
 
 | Voice | Samples | Type |
 |---|---|---|
@@ -193,12 +230,13 @@ Output: (B, 4) logits
 | Ibrahim | 135 | TTS (ElevenLabs) |
 | Mati | 135 | TTS (ElevenLabs) |
 | Podcast (Real) | 48 | Real human speech |
+| Zip Dataset (Real) | 80 | Real human speech (mixed speakers) |
 
 | Stutter Type | Count |
 |---|---|
-| Syllable Repetition | 167 |
-| Word Repetition | 138 |
-| Block | 158 |
+| Syllable Repetition | 203 |
+| Word Repetition | 173 |
+| Block | 167 |
 | Clean | 0 |
 
 ---
@@ -216,7 +254,8 @@ StutterNet_Data/
 ├── checkpoints/              # best_model.pt, last_model.pt
 ├── evaluation_results/       # confusion_matrix.png, attention plots
 ├── gdrive_data/              # Raw downloads from Google Drive
-│   └── Stutter Podcast Data/ # 48 real podcast MP3s
+│   ├── Stutter Podcast Data/ # 48 real podcast MP3s
+│   └── zipdata/Dataset/      # Zip dataset (Audios/, new data/, Transcriptions/)
 ├── voice_samples/            # Original voice clone recordings (Abdullah, Ibrahim, Mati)
 ├── model.py                  # StutterNet+ architecture
 ├── dataset.py                # Dataset, SpecAugment, dataloaders
@@ -232,7 +271,9 @@ StutterNet_Data/
 ├── verify.py                 # Verify dataset integrity
 ├── cloned_voices.json        # Voice name → ElevenLabs voice ID mapping
 ├── .gitignore                # Excludes WAV, .npy, .pt files (too large for git)
-└── progress.md               # This file
+├── progress.md               # Full project history and training results
+├── context.md                # Quick-reference project context
+└── CLAUDE.md                 # Claude Code project instructions
 ```
 
 ---
@@ -240,8 +281,9 @@ StutterNet_Data/
 ## Known Issues & Next Steps
 - **ElevenLabs API key** is hardcoded in generate_bulk.py and generate_multivoice.py — should be moved to environment variable
 - **No clean (non-stuttered) samples** — model only has 3 classes, adding class 0 would improve real-world usage
-- **Zip file from Google Drive** still needs downloading (permission issue) — may contain more real data
 - **Block detection** is the weakest class — more real block/pause data would help most
+- **Domain mismatch** — zip dataset's different acoustic properties caused regression; may need domain adaptation
+- **~26 unintegrated MP3s** in zip "new data" folder (Urdu-named files beyond CSV coverage: بلاک_*, حرف_*, لفظ_*)
 - **Prolongation** is currently merged into block — could be split into its own class if enough data
 - Large files (WAV, spectrograms, checkpoints) are in `.gitignore` — not in git repo
 - **GitHub repo:** https://github.com/matiuLlah011/StutterNet-
