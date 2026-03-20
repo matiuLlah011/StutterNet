@@ -1,7 +1,77 @@
 # StutterNet+ — Project Progress
 
 ## Overview
-**StutterNet+** is a deep learning system for **Urdu stuttering detection** using synthesized speech data. The model classifies speech into three stutter types: syllable repetition, word repetition, and block/pause stuttering.
+**StutterNet+** is a deep learning system for **Urdu stuttering detection** using synthesized + real speech data. The model classifies speech into three stutter types: syllable repetition (حرف), word repetition (لفظ), and block/pause stuttering (بلاک).
+
+**Current state:** 463 samples (55+ min audio), 3 TTS voices + real podcast data, 52.9% accuracy with best macro F1 = 0.52.
+
+---
+
+## Quick Context for New Sessions
+
+### How to run the full pipeline
+```bash
+# 1. Generate new TTS samples (if needed)
+PATH="$HOME/bin:$PATH" python3 generate_bulk.py          # Abdullah voice (135 samples)
+PATH="$HOME/bin:$PATH" python3 generate_multivoice.py    # Ibrahim + Mati voices (270 samples)
+
+# 2. Preprocess: WAV → spectrograms
+python3 preprocess.py
+
+# 3. Train the model
+python3 train.py
+
+# 4. Evaluate
+python3 evaluate.py
+```
+
+### Key files
+| File | Purpose |
+|---|---|
+| `model.py` | StutterNet+ architecture (SE-ResNet + BiLSTM + Attention, 722K params) |
+| `dataset.py` | Dataset class, SpecAugment, dataloaders with stratified split + oversampling |
+| `train.py` | Training loop with Focal Loss, AdamW, CosineAnnealingLR, early stopping |
+| `evaluate.py` | Full evaluation: per-class metrics, confusion matrix, attention plots |
+| `preprocess.py` | WAV → STFT spectrogram (257×701×1) normalized to [0,1] |
+| `generate_bulk.py` | ElevenLabs TTS generation for Abdullah voice (135 samples, contains API key) |
+| `generate_multivoice.py` | ElevenLabs TTS generation for Ibrahim + Mati voices (270 samples) |
+| `annotations/annotations.json` | Master dataset file — all sample metadata, labels, file paths |
+| `cloned_voices.json` | Voice IDs: Mati=LRG2Nfqsg6bBGBbp8lMW, Ibrahim=JjJY6XmAqwiYILFnZ2Tv, Abdullah=A4ASMsAwv9E88KBNEJJy |
+
+### Label convention
+| Label | Name | Urdu | ID Prefix |
+|---|---|---|---|
+| 0 | clean | صاف | (no samples yet) |
+| 1 | syllable_repetition | حرف | HARF_*, PODCAST_Phenome* |
+| 2 | word_repetition | لفظ | LAFZ_* |
+| 3 | block | بلاک | BLOCK_*, PODCAST_Pause*, PODCAST_Pronglation* |
+
+### Voice ID suffixes in sample names
+- No suffix (e.g., `HARF_005`) = Abdullah voice
+- `_I` suffix (e.g., `HARF_I005`) = Ibrahim voice
+- `_M` suffix (e.g., `HARF_M005`) = Mati voice
+- `PODCAST_` prefix = Real speech from podcast recordings
+
+### ElevenLabs TTS config
+- API key is in `generate_bulk.py` and `generate_multivoice.py` (should be moved to env var)
+- Model: `eleven_v3`
+- Voice settings: stability=0.4, similarity_boost=0.85, style=0.3, speaker_boost=True
+- Output: MP3 → converted to 16kHz mono 16-bit WAV
+
+### Model architecture
+```
+Input: (B, 1, 257, 701) spectrograms
+  → SE-ResNet Encoder (3 SE-ResBlocks: 32→64→128→128 channels)
+  → BiLSTM (input=128, hidden=64, bidirectional → 128)
+  → Bahdanau Attention Pooling (128→64→1)
+  → Classifier (Dropout→Linear 128→64→ReLU→Dropout→Linear 64→4)
+Output: (B, 4) logits
+```
+
+### Training config (TrainConfig in train.py)
+- epochs=100, batch_size=4, lr=1e-3, weight_decay=1e-3
+- val_split=0.2, patience=20, focal_gamma=2.0, dropout=0.5
+- Device auto-detected: MPS (Apple Silicon) > CUDA > CPU
 
 ---
 
@@ -26,24 +96,6 @@
 
 ## Phase 2: Initial Model Training
 
-### Architecture — StutterNet+ (FluentNet)
-```
-SE-ResNet Encoder → BiLSTM → Attention Pooling → Classifier
-```
-- **SE-ResNet Encoder:** 3 SE-ResBlocks with squeeze-and-excitation channel attention
-- **BiLSTM:** Bidirectional LSTM for temporal modeling (hidden=64)
-- **Attention Pooling:** Bahdanau-style attention over temporal sequence
-- **Classifier:** 2-layer MLP with dropout
-- **Parameters:** 722,680 trainable
-
-### Training Configuration
-- Optimizer: AdamW (lr=1e-3, weight_decay=1e-3)
-- Scheduler: CosineAnnealingLR
-- Loss: Focal Loss with inverse-frequency class weights
-- Augmentation: SpecAugment (freq/time masking, Gaussian noise, random gain, time reversal)
-- Oversampling: Minority class upsampling for balanced training
-- Early stopping: patience=20
-
 ### Results (145 samples — Abdullah only)
 | Class | Precision | Recall | F1-Score |
 |---|---|---|---|
@@ -52,8 +104,8 @@ SE-ResNet Encoder → BiLSTM → Attention Pooling → Classifier
 | Block | 0.50 | 0.12 | 0.20 |
 | **Overall Accuracy** | | | **53.8%** |
 
-- Trained for 32 epochs (early stopped)
-- Best val loss: 0.2946
+- Trained for 32 epochs (early stopped), best val loss: 0.2946
+- Block detection was very weak (F1=0.20)
 
 ---
 
@@ -67,25 +119,7 @@ SE-ResNet Encoder → BiLSTM → Attention Pooling → Classifier
 - Block stutters enhanced with longer pauses (`[Silence]` markers) for more realistic blocking
 - Same 45 scenarios reused across voices for speaker diversity
 
-### Updated Dataset Totals
-| Voice | Samples |
-|---|---|
-| Abdullah (original) | 145 |
-| Ibrahim (new) | 135 |
-| Mati (new) | 135 |
-| **Total** | **415** |
-
-| Stutter Type | Count |
-|---|---|
-| Syllable Repetition | 139 |
-| Word Repetition | 138 |
-| Block | 138 |
-
----
-
-## Phase 4: Retrained Model
-
-### Results (415 samples — 3 voices)
+### Results (415 samples — 3 TTS voices)
 | Class | Precision | Recall | F1-Score |
 |---|---|---|---|
 | Syllable Repetition | 0.71 | 0.86 | **0.78** |
@@ -93,51 +127,121 @@ SE-ResNet Encoder → BiLSTM → Attention Pooling → Classifier
 | Block | 0.57 | 0.03 | 0.06 |
 | **Overall Accuracy** | | | **56.1%** |
 
-- Trained for 75 epochs (early stopped)
-- Best val loss: 0.3153
+- Trained for 75 epochs (early stopped), best val loss: 0.3153
+- Syllable rep improved significantly, but block detection collapsed
 
-### Comparison: Before vs After
-| Metric | 145 samples | 415 samples | Change |
+---
+
+## Phase 4: Real Podcast Data Integration
+
+### Data Source
+- Downloaded **48 real stuttering recordings** from Google Drive podcast collection
+- Source: `https://drive.google.com/drive/folders/1jpxY20oReVYuJD1YKTG5IujBBMzQvXyp`
+- These are **real human speech** clips (not TTS) — much more valuable for training
+- Additional zip file at `https://drive.google.com/file/d/1UWVAV8po7-j4PIaNyFmQHz8BrQNvxfxO/view` could not be downloaded (permission issue — needs "Anyone with the link" sharing)
+
+### Downloaded Data Breakdown
+| Category | Files | Duration | Mapped To |
 |---|---|---|---|
-| Overall Accuracy | 53.8% | 56.1% | +2.3% |
-| Syllable Rep F1 | 0.67 | 0.78 | **+0.11** |
-| Word Rep F1 | 0.59 | 0.58 | -0.01 |
-| Block F1 | 0.20 | 0.06 | -0.14 |
+| Pause/Pasue (block) | 15 | 1.8 min | block (label 3) |
+| Phenome (syllable rep) | 28 | 3.3 min | syllable_repetition (label 1) |
+| Prolongation | 5 | 0.5 min | block (label 3) |
+| **Total** | **48** | **5.6 min** | |
 
-### Key Observations
-- **Syllable repetition** improved significantly with multi-voice data
-- **Word repetition** remained stable
-- **Block detection** remains the hardest class — pauses are subtle in spectrograms and easily confused with other stutter types
+- Files saved to `gdrive_data/Stutter Podcast Data/`
+- Converted to WAV and added to `samples/` folders with `PODCAST_` prefix IDs
+
+### Results (463 samples — 3 TTS voices + real podcast)
+| Class | Precision | Recall | F1-Score |
+|---|---|---|---|
+| Syllable Repetition | 0.63 | 0.51 | 0.57 |
+| Word Repetition | 0.54 | 0.79 | **0.64** |
+| Block | 0.40 | 0.32 | **0.35** |
+| **Overall Accuracy** | | | **52.9%** |
+| **Macro F1** | | | **0.52** |
+
+- Trained for 41 epochs (early stopped), best val loss: 0.3055
+
+---
+
+## Full Results Comparison
+
+| Metric | Phase 2 (145) | Phase 3 (415) | Phase 4 (463) | Best |
+|---|---|---|---|---|
+| Overall Accuracy | 53.8% | **56.1%** | 52.9% | Phase 3 |
+| Syllable Rep F1 | 0.67 | **0.78** | 0.57 | Phase 3 |
+| Word Rep F1 | 0.59 | 0.58 | **0.64** | Phase 4 |
+| Block F1 | 0.20 | 0.06 | **0.35** | Phase 4 |
+| **Macro F1** | 0.49 | 0.47 | **0.52** | Phase 4 |
+| Val Loss | **0.2946** | 0.3153 | 0.3055 | Phase 2 |
+
+### Key Takeaways
+1. **Real podcast data was the biggest improvement** — block F1 went from 0.06 → 0.35
+2. **Multi-voice TTS helped syllable detection** (F1=0.78 in Phase 3)
+3. **Macro F1 is highest with real data** (0.52) — most balanced across all classes
+4. More real speech data is the most impactful next step
+
+---
+
+## Current Dataset Summary
+
+### Total: 463 samples (~61 minutes of audio)
+
+| Voice | Samples | Type |
+|---|---|---|
+| Abdullah | 145 | TTS (ElevenLabs) |
+| Ibrahim | 135 | TTS (ElevenLabs) |
+| Mati | 135 | TTS (ElevenLabs) |
+| Podcast (Real) | 48 | Real human speech |
+
+| Stutter Type | Count |
+|---|---|
+| Syllable Repetition | 167 |
+| Word Repetition | 138 |
+| Block | 158 |
+| Clean | 0 |
 
 ---
 
 ## Project Structure
 ```
 StutterNet_Data/
-├── annotations/          # annotations.json with all sample metadata
-├── samples/              # WAV audio files by stutter type
-│   ├── syllable_repetition/
-│   ├── word_repetition/
-│   ├── block/
-│   └── clean/
-├── spectrograms/         # Preprocessed spectrograms (.npy + .png)
-├── checkpoints/          # Model checkpoints (best_model.pt, last_model.pt)
-├── evaluation_results/   # Confusion matrix, attention visualizations
-├── voice_samples/        # Original voice clone recordings
-├── model.py              # StutterNet+ architecture (SE-ResNet + BiLSTM + Attention)
-├── dataset.py            # Dataset, augmentation, dataloaders
-├── train.py              # Training pipeline
-├── evaluate.py           # Evaluation and metrics
-├── preprocess.py         # WAV → spectrogram conversion
-├── generate_bulk.py      # Bulk TTS generation (Abdullah)
-├── generate_multivoice.py # Multi-voice TTS generation (Ibrahim + Mati)
-└── progress.md           # This file
+├── annotations/              # annotations.json — master dataset metadata
+├── samples/                  # WAV audio files (16kHz mono)
+│   ├── syllable_repetition/  # HARF_*, HARF_I*, HARF_M*, PODCAST_Phenome*
+│   ├── word_repetition/      # LAFZ_*, LAFZ_I*, LAFZ_M*
+│   ├── block/                # BLOCK_*, BLOCK_I*, BLOCK_M*, PODCAST_Pause*, PODCAST_Pronglation*
+│   └── clean/                # (empty — no clean samples yet)
+├── spectrograms/             # Preprocessed spectrograms (.npy 257×701×1 + .png)
+├── checkpoints/              # best_model.pt, last_model.pt
+├── evaluation_results/       # confusion_matrix.png, attention plots
+├── gdrive_data/              # Raw downloads from Google Drive
+│   └── Stutter Podcast Data/ # 48 real podcast MP3s
+├── voice_samples/            # Original voice clone recordings (Abdullah, Ibrahim, Mati)
+├── model.py                  # StutterNet+ architecture
+├── dataset.py                # Dataset, SpecAugment, dataloaders
+├── train.py                  # Training pipeline (Focal Loss, AdamW, early stopping)
+├── evaluate.py               # Evaluation metrics + visualizations
+├── preprocess.py             # WAV → spectrogram pipeline
+├── generate_bulk.py          # TTS generation — Abdullah (135 samples)
+├── generate_multivoice.py    # TTS generation — Ibrahim + Mati (270 samples)
+├── generate_audio.py         # Single sample TTS generation utility
+├── generate_test.py          # Test generation script
+├── list_voices.py            # List available ElevenLabs voices
+├── test_voices.py            # Test voice clones
+├── verify.py                 # Verify dataset integrity
+├── cloned_voices.json        # Voice name → ElevenLabs voice ID mapping
+├── .gitignore                # Excludes WAV, .npy, .pt files (too large for git)
+└── progress.md               # This file
 ```
 
 ---
 
-## Next Steps
-- Improve block detection (more distinctive pause patterns, higher focal gamma)
-- Add clean (non-stuttered) speech samples as a 4th class
-- Experiment with more training epochs and hyperparameter tuning
-- Add more speakers for better generalization
+## Known Issues & Next Steps
+- **ElevenLabs API key** is hardcoded in generate_bulk.py and generate_multivoice.py — should be moved to environment variable
+- **No clean (non-stuttered) samples** — model only has 3 classes, adding class 0 would improve real-world usage
+- **Zip file from Google Drive** still needs downloading (permission issue) — may contain more real data
+- **Block detection** is the weakest class — more real block/pause data would help most
+- **Prolongation** is currently merged into block — could be split into its own class if enough data
+- Large files (WAV, spectrograms, checkpoints) are in `.gitignore` — not in git repo
+- **GitHub repo:** https://github.com/matiuLlah011/StutterNet-
