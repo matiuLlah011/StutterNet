@@ -1,0 +1,21 @@
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+
+# Claude
+.claude/
+
+# Large data files (audio + spectrograms)
+samples/**/*.wav
+samples/**/*.mp3
+spectrograms/**/*.npy
+spectrograms/**/*.png
+checkpoints/*.pt
+
+# Keep directory structure
+!samples/*/.gitkeep
+!spectrograms/*/.gitkeep
+!checkpoints/.gitkeep
