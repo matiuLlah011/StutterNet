@@ -8,14 +8,11 @@ __pycache__/
 # Claude
 .claude/
 
-# Large data files (audio + spectrograms)
-samples/**/*.wav
-samples/**/*.mp3
+# Spectrograms and checkpoints (can be regenerated)
 spectrograms/**/*.npy
 spectrograms/**/*.png
 checkpoints/*.pt
 
 # Keep directory structure
-!samples/*/.gitkeep
 !spectrograms/*/.gitkeep
 !checkpoints/.gitkeep
