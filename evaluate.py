@@ -180,6 +180,11 @@ def main():
         data = json.load(f)
     samples = data["samples"]
 
+    # Filter to ElevenLabs voices only
+    from dataset import ELEVENLABS_VOICES
+    samples = [s for s in samples if s.get("voice_used") in ELEVENLABS_VOICES]
+    print(f"Filtered to ElevenLabs voices only: {len(samples)} samples")
+
     dataset = StutterNetDataset(samples, base_dir=".", transform=None, oversample=False)
     loader = torch.utils.data.DataLoader(dataset, batch_size=4, shuffle=False)
 

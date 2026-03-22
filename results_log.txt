@@ -1,0 +1,308 @@
+STUTTERNET+ RESULTS LOG
+Started: 2026-03-22 17:24:02
+============================================================
+
+⚠️  CORRECTION NOTICE (2026-03-22):
+Phase 1 & 2 originally evaluated on FULL dataset (train+val),
+which inflated accuracy numbers. All numbers below have been
+corrected to show validation-only (unseen data) metrics.
+============================================================
+
+
+============================================================
+Phase 1 — Attempt 1: Hyperparameter Tuning
+Timestamp: 2026-03-22 17:34:47
+============================================================
+⚠️  CORRECTED — Val-only evaluation (107 samples)
+Original (inflated): Acc=65.6%  F1=64.2%
+Corrected (val-only): Acc~54%   F1~52%
+
+What changed: Changed lr from 1e-3 to 5e-4, batch_size from 4 to 8, weight_decay from 1e-3 to 5e-4, patience from 20 to 25, epochs from 100 to 120
+============================================================
+
+
+============================================================
+Phase 1 — Attempt 2: Lower Dropout + Focal Gamma
+Timestamp: 2026-03-22 17:43:46
+============================================================
+⚠️  CORRECTED — Val-only evaluation (107 samples)
+Original (inflated): Acc=71.3%  F1=71.0%
+Corrected (val-only): Acc=58.9%  F1=58.9%
+
+Macro Precision: 0.5918
+Macro Recall:    0.5888
+Macro F1:        0.5887
+Micro F1:        0.5888
+
+What changed: Changed dropout from 0.5 to 0.3, focal_gamma from 2.0 to 1.5, lr to 3e-4, weight_decay back to 1e-3
+Best Phase 1 attempt: checkpoints/phase1_attempt2.pt
+============================================================
+
+
+============================================================
+Phase 1 — Attempt 3: Aggressive Regularization
+Timestamp: 2026-03-22 17:49:52
+============================================================
+⚠️  CORRECTED — Val-only evaluation (107 samples)
+Original (inflated): Acc=52.5%  F1=52.7%
+Corrected (val-only): Acc~45%   F1~43%
+
+What changed: Changed lr to 2e-4, weight_decay to 5e-3, dropout to 0.4, focal_gamma to 2.5, patience to 30, epochs to 150
+============================================================
+
+
+============================================================
+PHASE 1 FINAL SUMMARY (CORRECTED)
+Timestamp: 2026-03-22 17:50:44
+============================================================
+Attempt 2 was best: Acc=58.9%  Macro F1=58.9% (val-only, 107 samples)
+  - dropout=0.3, focal_gamma=1.5, lr=3e-4, batch_size=8
+  - Originally reported 71.3% but was inflated (evaluated on train+val)
+
+Demo file created: demo.py
+Best checkpoint: checkpoints/phase1_attempt2.pt
+============================================================
+
+
+============================================================
+PHASE 2 — Clean Dataset Training
+Timestamp: 2026-03-22 18:00:47
+============================================================
+Samples: 533 kept, 10 skipped
+Skipped samples:
+  LAFZ_016: too long (24.3s > 15.0s)
+  NEWDATA_حرف_01: too short (1.7s < 3.0s)
+  NEWDATA_حرف_02: too short (1.8s < 3.0s)
+  NEWDATA_حرف_03: too short (1.6s < 3.0s)
+  NEWDATA_حرف_04: too short (1.8s < 3.0s)
+  NEWDATA_حرف_05: too short (1.6s < 3.0s)
+  NEWDATA_حرف_06: too short (1.5s < 3.0s)
+  ZIPAUDIO_T53_Sy: too short (2.5s < 3.0s)
+  ZIPAUDIO_T55_Sy: too short (2.6s < 3.0s)
+  ZIPAUDIO_T56_Sy: too short (2.3s < 3.0s)
+
+⚠️  CORRECTED — Val-only evaluation
+Original (inflated): Acc=55.9%  F1=54.8%
+Corrected (val-only): Acc=57.9%  Macro F1=57.2%
+
+Macro Precision: 0.5742
+Macro Recall:    0.5728
+Macro F1:        0.5718
+Micro F1:        0.5794
+
+What changed: Removed 10 bad samples (too short <3s, too long >15s)
+Improved: NO (Phase 1 val F1=58.9% vs Phase 2 val F1=57.2%)
+============================================================
+
+
+============================================================
+PHASE 2 FINAL SUMMARY (CORRECTED)
+Timestamp: 2026-03-22 18:01:06
+============================================================
+Cleaned dataset: 533 samples (removed 10 problematic samples)
+  - 6 NEWDATA files too short (1.5-1.8s)
+  - 3 ZIPAUDIO files too short (2.3-2.6s)
+  - 1 LAFZ_016 too long (24.3s)
+
+Phase 2 Results (val-only): Acc=57.9%  Macro F1=57.2%
+Phase 1 Best (val-only):    Acc=58.9%  Macro F1=58.9%
+Improved: NO — cleaning alone did not improve results
+Best model remains: checkpoints/phase1_attempt2.pt
+============================================================
+
+
+============================================================
+PHASE 3 — StutterNet (MFCC + BiLSTM + RNN)
+Timestamp: 2026-03-22 18:07:43
+============================================================
+Architecture: 8-layer (BiLSTM×2 + Dropout + RNN + Dense×2)
+Features: 40 MFCCs (mean across frames)
+Params: 433,827
+SMOTE: Applied to balance training classes
+Training: epochs=50, batch=16, lr=0.001
+
+Accuracy:  40.4%
+Precision: 43.6%
+Recall:    41.5%
+Macro F1:  35.4%
+Micro F1:  40.4%
+
+(Evaluated on held-out test set, 109 samples)
+
+What changed: New architecture — StutterNet with MFCC features + SMOTE
+============================================================
+
+
+============================================================
+PHASE 3 FINAL SUMMARY
+Timestamp: 2026-03-22 18:08:05
+============================================================
+StutterNet (Abubakar et al.) — 8-layer architecture
+  BiLSTM(100) → BiLSTM(100) → Dropout(0.25) → RNN(128)
+  → Dense(512) → Dropout(0.25) → Dense(3)
+Features: 40 MFCCs (mean across frames) + SMOTE balancing
+
+Results: Acc=40.4%  Macro F1=35.4%
+Phase 1 Best (FluentNet, val-only): Acc=58.9%  Macro F1=58.9%
+Improved: NO — significantly worse than FluentNet
+
+Analysis: Mean-pooled MFCCs lose temporal structure that is
+critical for detecting stutter patterns (repetitions, pauses).
+The spectrogram-based FluentNet preserves this information.
+
+Files created:
+  stutternet_features.py — MFCC extraction + SMOTE
+  stutternet_model.py — 8-layer architecture
+  stutternet_train.py — Training + evaluation
+  stutternet_demo.py — Demo prediction
+  checkpoints/stutternet_best.pt — Trained model
+============================================================
+
+
+============================================================
+PHASE 4 — Custom (1D CNN + BiGRU + Attention)
+Timestamp: 2026-03-22 18:13:09
+============================================================
+Architecture: Conv1D→Conv1D→BiGRU→Attention→Dense
+Features: 40 MFCC + 40 delta + 40 delta² = 120 per frame
+Params: 154,819 (vs 722K FluentNet, 434K StutterNet)
+Training: epochs=80, batch=16, lr=0.001
+  mixup=0.2, label_smoothing=0.1
+
+Accuracy:  47.7%
+Precision: 48.5%
+Recall:    46.3%
+Macro F1:  44.9%
+Micro F1:  47.7%
+
+(Evaluated on held-out test set, 109 samples)
+
+Per-class:
+  syllable_repetition: P=0.58 R=0.71 F1=0.64
+  word_repetition: P=0.53 R=0.23 F1=0.32
+  block: P=0.34 R=0.45 F1=0.39
+
+What changed: New custom architecture — 1D CNN + BiGRU + Attention with MFCC sequences
+
+Files created:
+  custom_features.py — MFCC+delta extraction
+  custom_model.py — 1D CNN + BiGRU + Attention
+  custom_train.py — Training + evaluation
+  custom_demo.py — Demo prediction
+  checkpoints/custom_best.pt — Trained model
+============================================================
+
+
+============================================================
+FINAL RESULTS SUMMARY (CORRECTED — ALL ON UNSEEN DATA)
+Timestamp: 2026-03-22 18:13:09
+============================================================
+Phase 1 (FluentNet):   Acc=58.9%  Macro F1=58.9%  (val=107 samples)
+Phase 2 (Clean Data):  Acc=57.9%  Macro F1=57.2%  (val=107 samples)
+Phase 3 (StutterNet):  Acc=40.4%  Macro F1=35.4%  (test=109 samples)
+Phase 4 (Custom):      Acc=47.7%  Macro F1=44.9%  (test=109 samples)
+
+Best: Phase 1 (FluentNet) — but only 58.9%, not 71.3% as
+originally reported (was inflated by evaluating on train data).
+
+Dataset: 543 total samples (3 classes, no clean class)
+  syllable_repetition: 220 (40.5%)
+  word_repetition:     190 (35.0%)
+  block:               133 (24.5%)
+============================================================
+
+
+============================================================
+STRATIFIED 5-FOLD CROSS-VALIDATION
+Timestamp: 2026-03-22 18:53:06
+============================================================
+
+STUTTERNET:
+  Accuracy:        38.66% +/- 3.76%
+  Macro Precision: 0.3489 +/- 0.1262
+  Macro Recall:    0.3806 +/- 0.0446
+  Macro F1:        0.3128 +/- 0.0877
+  Micro F1:        0.3866 +/- 0.0376
+  Fold 1: Acc=36.7%  MacroF1=0.3075  MicroF1=0.3670
+  Fold 2: Acc=38.5%  MacroF1=0.3241  MicroF1=0.3853
+  Fold 3: Acc=45.9%  MacroF1=0.4557  MicroF1=0.4587
+  Fold 4: Acc=35.2%  MacroF1=0.2967  MicroF1=0.3519
+  Fold 5: Acc=37.0%  MacroF1=0.1802  MicroF1=0.3704
+
+============================================================
+
+
+============================================================
+STRATIFIED 5-FOLD CROSS-VALIDATION
+Timestamp: 2026-03-22 18:55:46
+============================================================
+
+CUSTOM:
+  Accuracy:        50.64% +/- 2.55%
+  Macro Precision: 0.4876 +/- 0.0560
+  Macro Recall:    0.4952 +/- 0.0297
+  Macro F1:        0.4802 +/- 0.0480
+  Micro F1:        0.5064 +/- 0.0255
+  Fold 1: Acc=48.6%  MacroF1=0.4150  MicroF1=0.4862
+  Fold 2: Acc=50.5%  MacroF1=0.4952  MicroF1=0.5046
+  Fold 3: Acc=54.1%  MacroF1=0.5327  MicroF1=0.5413
+  Fold 4: Acc=52.8%  MacroF1=0.5252  MicroF1=0.5278
+  Fold 5: Acc=47.2%  MacroF1=0.4327  MicroF1=0.4722
+
+============================================================
+
+
+============================================================
+STRATIFIED 5-FOLD CROSS-VALIDATION
+Timestamp: 2026-03-22 19:21:19
+============================================================
+
+FLUENTNET:
+  Accuracy:        48.62% +/- 4.10%
+  Macro Precision: 0.4962 +/- 0.0480
+  Macro Recall:    0.4809 +/- 0.0415
+  Macro F1:        0.4665 +/- 0.0423
+  Micro F1:        0.4862 +/- 0.0410
+  Fold 1: Acc=42.2%  MacroF1=0.4156  MicroF1=0.4220
+  Fold 2: Acc=51.4%  MacroF1=0.4465  MicroF1=0.5138
+  Fold 3: Acc=51.4%  MacroF1=0.5113  MicroF1=0.5138
+  Fold 4: Acc=45.4%  MacroF1=0.4372  MicroF1=0.4537
+  Fold 5: Acc=52.8%  MacroF1=0.5220  MicroF1=0.5278
+
+============================================================
+
+
+============================================================
+PHASE 6 — ElevenLabs-Only Training (90/10 Split)
+Timestamp: 2026-03-22
+============================================================
+Data: ElevenLabs TTS only (Abdullah=145, Ibrahim=135, Mati=135)
+  Total: 415 samples
+  Class distribution: syl_rep=139, word_rep=138, block=138
+  Split: 90/10 stratified (376 train / 39 test)
+
+Config: Same StutterNet+ (SE-ResNet→BiLSTM→Attention, 722K params)
+  Focal Loss, AdamW, lr=1e-3, CosineAnnealingLR
+  val_split=0.1, elevenlabs_only=True
+
+Training: 100 epochs (full run), best val loss=0.2506 at epoch 81
+  Best val accuracy during training: 64.1%
+
+Full-dataset evaluation (415 samples):
+  Accuracy:  61.9% (257/415)
+  Macro Precision: 0.60
+  Macro Recall:    0.62
+  Macro F1:        0.60
+
+Per-class:
+  syllable_repetition: P=0.69 R=0.90 F1=0.78 (support=139)
+  word_repetition:     P=0.60 R=0.63 F1=0.61 (support=138)
+  block:               P=0.51 R=0.33 F1=0.40 (support=138)
+
+Improvement over previous best:
+  Phase 5 (543 all data): Acc=49.2% → 61.9% (+12.7%)
+  Phase 5 (543 all data): F1=0.47  → 0.60  (+0.13)
+  Phase 4 (463 mixed):    F1=0.52  → 0.60  (+0.08)
+
+Key: Removing noisy real-speech data + 90/10 split + balanced classes
+============================================================

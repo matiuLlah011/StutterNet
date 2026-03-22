@@ -109,12 +109,24 @@ class StutterNetDataset(Dataset):
         return spec, label
 
 
+ELEVENLABS_VOICES = {"Abdullah", "Ibrahim", "Mati"}
+
+
 def create_dataloaders(annotations_path, base_dir, batch_size=4,
-                       val_split=0.2, seed=42):
-    """Create train/val dataloaders with stratified split."""
+                       val_split=0.2, seed=42, elevenlabs_only=False):
+    """Create train/val dataloaders with stratified split.
+
+    Args:
+        elevenlabs_only: If True, filter to only ElevenLabs TTS voices
+                         (Abdullah, Ibrahim, Mati).
+    """
     with open(annotations_path, "r", encoding="utf-8") as f:
         data = json.load(f)
     samples = data["samples"]
+
+    if elevenlabs_only:
+        samples = [s for s in samples if s.get("voice_used") in ELEVENLABS_VOICES]
+        print(f"Filtered to ElevenLabs voices only: {len(samples)} samples")
 
     # Stratified split
     random.seed(seed)

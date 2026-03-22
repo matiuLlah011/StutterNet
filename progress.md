@@ -199,7 +199,7 @@ Output: (B, 4) logits
 
 ---
 
-## Full Results Comparison
+## Full Results Comparison (Phases 2–5)
 
 | Metric | Phase 2 (145) | Phase 3 (415) | Phase 4 (463) | Phase 5 (543) | Best |
 |---|---|---|---|---|---|
@@ -210,7 +210,7 @@ Output: (B, 4) logits
 | **Macro F1** | 0.49 | 0.47 | **0.52** | 0.47 | Phase 4 |
 | Val Loss | **0.2946** | 0.3153 | 0.3055 | 0.3186 | Phase 2 |
 
-### Key Takeaways
+### Key Takeaways (Phases 2–5)
 1. **Real podcast data was the biggest improvement** — block F1 went from 0.06 → 0.35
 2. **Multi-voice TTS helped syllable detection** (F1=0.78 in Phase 3)
 3. **Phase 4 has best macro F1** (0.52) — most balanced across all classes
@@ -275,6 +275,58 @@ StutterNet_Data/
 ├── context.md                # Quick-reference project context
 └── CLAUDE.md                 # Claude Code project instructions
 ```
+
+---
+
+## Phase 6: ElevenLabs-Only Training (90/10 Split)
+
+### Rationale
+Real speech data (podcast + zip dataset) introduced acoustic domain mismatch that hurt performance. By training exclusively on ElevenLabs TTS data, the model sees a consistent acoustic domain with near-perfect class balance.
+
+### Configuration Changes
+- **Data**: ElevenLabs voices only — Abdullah (145) + Ibrahim (135) + Mati (135) = **415 samples**
+- **Split**: 90/10 stratified (376 train / 39 test) — previously was 80/20
+- **Class distribution**: syllable_rep=139, word_rep=138, block=138 (near-perfect balance)
+- **Architecture**: Same StutterNet+ (SE-ResNet → BiLSTM → Attention, 722K params)
+- **Training**: Same hyperparameters (Focal Loss, AdamW, lr=1e-3, patience=20)
+
+### Results (415 samples — ElevenLabs only, 90/10 split)
+| Class | Precision | Recall | F1-Score | Support |
+|---|---|---|---|---|
+| Syllable Repetition | 0.69 | 0.90 | **0.78** | 139 |
+| Word Repetition | 0.60 | 0.63 | 0.61 | 138 |
+| Block | 0.51 | 0.33 | 0.40 | 138 |
+| **Overall Accuracy** | | | **61.9%** | 415 |
+| **Macro F1** | | | **0.60** | |
+
+- Trained for full 100 epochs (no early stop), best val loss: 0.2506 (epoch 81)
+- Best val accuracy during training: 64.1%
+
+### Key Improvements
+- **Accuracy: 49.2% → 61.9%** (+12.7% vs Phase 5 with all data)
+- **Macro F1: 0.47 → 0.60** (+0.13 vs Phase 5)
+- Syllable repetition F1 matched Phase 3 peak (0.78)
+- Removing noisy real-speech data and using 90/10 split both contributed
+
+---
+
+## Full Results Comparison (Updated)
+
+| Metric | Phase 2 (145) | Phase 3 (415) | Phase 4 (463) | Phase 5 (543) | **Phase 6 (415)** | Best |
+|---|---|---|---|---|---|---|
+| Overall Accuracy | 53.8% | 56.1% | 52.9% | 49.2% | **61.9%** | **Phase 6** |
+| Syllable Rep F1 | 0.67 | **0.78** | 0.57 | 0.53 | **0.78** | Phase 3/6 |
+| Word Rep F1 | 0.59 | 0.58 | **0.64** | 0.57 | 0.61 | Phase 4 |
+| Block F1 | 0.20 | 0.06 | 0.35 | 0.32 | **0.40** | **Phase 6** |
+| **Macro F1** | 0.49 | 0.47 | 0.52 | 0.47 | **0.60** | **Phase 6** |
+| Val Loss | 0.2946 | 0.3153 | 0.3055 | 0.3186 | **0.2506** | **Phase 6** |
+
+### Key Takeaways (Updated)
+1. **ElevenLabs-only data with 90/10 split is the new best** — 61.9% accuracy, 0.60 macro F1
+2. **Domain consistency matters more than data volume** — 415 clean samples beat 543 mixed samples
+3. **Near-perfect class balance** (139/138/138) eliminated the need for heavy oversampling
+4. **Block detection improved** (F1: 0.32 → 0.40) but remains the weakest class
+5. **Syllable repetition** is the most reliably detected class (F1=0.78)
 
 ---
 

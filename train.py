@@ -30,10 +30,11 @@ class TrainConfig:
     batch_size: int = 4
     learning_rate: float = 1e-3
     weight_decay: float = 1e-3
-    val_split: float = 0.2
+    val_split: float = 0.1
     seed: int = 42
     focal_gamma: float = 2.0
     patience: int = 20
+    elevenlabs_only: bool = True
 
 
 class FocalLoss(nn.Module):
@@ -176,7 +177,7 @@ def train(config=None):
     train_loader, val_loader, train_samples, val_samples = create_dataloaders(
         config.annotations_path, config.base_dir,
         batch_size=config.batch_size, val_split=config.val_split,
-        seed=config.seed,
+        seed=config.seed, elevenlabs_only=config.elevenlabs_only,
     )
 
     # Model

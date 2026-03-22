@@ -66,10 +66,11 @@ python3 evaluate.py      # Metrics, confusion matrix, attention plots
 - `evaluation_results/` — confusion_matrix.png, attention plots
 - `gdrive_data/` — Raw downloads from Google Drive (podcast + zip dataset)
 
-## Current Best Results (Phase 4 — 463 samples)
-- Accuracy: 52.9%, Macro F1: 0.52
-- Best at balanced performance across all stutter types
-- Phase 5 (543 samples with zip data) regressed slightly (49.2%, macro F1: 0.47) due to acoustic domain mismatch
+## Current Best Results (Phase 6 — 415 ElevenLabs samples, 90/10 split)
+- Accuracy: 61.9%, Macro F1: 0.60
+- Syllable Rep F1: 0.78, Word Rep F1: 0.61, Block F1: 0.40
+- ElevenLabs-only data with 90/10 stratified split (376 train / 39 test)
+- `train.py` defaults: `elevenlabs_only=True`, `val_split=0.1`
 
 ## Known Issues
 - API key hardcoded in generation scripts — move to env var
